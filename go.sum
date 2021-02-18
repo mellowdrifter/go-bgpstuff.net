@@ -1,0 +1,6 @@
+github.com/google/go-cmp v0.5.4 h1:L8R9j+yAqZuZjsqh/z+F1NCffTKKLShY6zXTItVIZ8M=
+github.com/google/go-cmp v0.5.4/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+github.com/mellowdrifter/bogons v0.0.0-20210122220308-a5c56e638df5 h1:PNZys8Vnd84knfSHghuiJwC3+SXh21FqyFdBL2qpylQ=
+github.com/mellowdrifter/bogons v0.0.0-20210122220308-a5c56e638df5/go.mod h1:B6j4/g7qNRMJJEA3uJuqXJq6i02mGjQaWZo7yr8X+1g=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
