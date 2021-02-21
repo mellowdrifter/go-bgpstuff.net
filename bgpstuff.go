@@ -3,11 +3,10 @@ package bgpstuff
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
-	"net/url"
-	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mellowdrifter/bogons"
@@ -15,7 +14,7 @@ import (
 
 const (
 	version = "1.0.0"
-	api     = "https://bgpstuff.net"
+	api     = "https://test.bgpstuff.net"
 )
 
 // Client is a client to the bgpstuff.net REST API
@@ -32,9 +31,9 @@ type response struct {
 type data struct {
 	Action    string     // What action is being performed?
 	Route     string     // /route response
-	ASPath    []string   // /aspath response
-	ASSet     []string   // /aspath response
-	Origin    string     // /origin response
+	ASPath    []string   `json:"ASPath"` //aspath response
+	ASSet     []string   `json:"ASSet"`
+	Origin    int        `json:"Origin,string,omitempty"`
 	ROA       string     // /roa response
 	ASName    string     // /asname response
 	ASLocale  string     // /asname locale
@@ -74,61 +73,179 @@ type Invalids struct {
 	Prefixes []string
 }
 
+//NewBGPClient return a pointer to a new client
+func NewBGPClient() *Client {
+	return &Client{}
+}
+
+func newHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+	}
+}
+
+func getURI(urls []string) string {
+	var uri strings.Builder
+	uri.WriteString(api)
+	for _, v := range urls {
+		uri.WriteString("/")
+		uri.WriteString(v)
+	}
+
+	return uri.String()
+}
+
 // getRequest will take a handler and any arugments and request
 // a response from the bgpstuff.net API. Timeouts are set to 5 seconds
 // to prevent hanging connections.
-func (c *Client) getRequest(urls ...string) (response, error) {
-	var client = &http.Client{
-		Timeout: time.Second * 5,
-	}
+func (c Client) getRequest(urls ...string) (*response, error) {
+	client := newHTTPClient(time.Second * 5)
 
-	u, err := url.Parse(api)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, url := range urls {
-		u.Path = path.Join(u.Path, url)
-	}
+	uri := getURI(urls)
 
 	var resp response
-	re, err := http.NewRequest("GET", u.String(), nil)
+	re, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
-		return response{}, err
+		return nil, err
 	}
 	re.Header.Set("Content-Type", "application/json")
+	re.Header.Set("User-Agent", fmt.Sprintf("go-bgpstuff.net/%s", version))
 
 	res, err := client.Do(re)
 	if err != nil {
-		return response{}, err
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Received status: %s (%d)", http.StatusText(res.StatusCode), res.StatusCode)
 	}
 
 	defer res.Body.Close()
 
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-		return response{}, err
+		return nil, err
 	}
 
-	return resp, nil
+	return &resp, nil
 }
 
-func (c Client) GetRoute(ip string) (*net.IPNet, error) {
+// GetRoute uses the /route handler
+func (c *Client) GetRoute(ip string) (*net.IPNet, bool, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return nil, fmt.Errorf("Not a valid IP")
+		return nil, false, fmt.Errorf("Not a valid IP")
 	}
+
 	p := net.ParseIP(ip)
 	resp, err := c.getRequest("route", p.String())
 	if err != nil {
-		return nil, err
-	}
-	_, ipnet, err := net.ParseCIDR(getRouteFromResponse(resp))
-	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return ipnet, nil
+	exists := getExistsFromResponse(resp)
+	if !exists {
+		return nil, false, err
+	}
+
+	_, ipnet, err := net.ParseCIDR(resp.Data.Route)
+	if err != nil {
+		return nil, exists, err
+	}
+
+	return ipnet, exists, nil
 }
 
-func getRouteFromResponse(res response) string {
-	return res.Data.Route
+// GetOrigin uses the /origin handler.
+func (c *Client) GetOrigin(ip string) (int, bool, error) {
+	if !bogons.ValidPublicIP(ip) {
+		return 0, false, fmt.Errorf("Not a valid IP")
+	}
+
+	p := net.ParseIP(ip)
+	resp, err := c.getRequest("origin", p.String())
+	if err != nil {
+		return 0, false, err
+	}
+
+	exists := getExistsFromResponse(resp)
+	if !exists {
+		return 0, false, err
+	}
+
+	origin := getOriginFromResponse(resp)
+	if origin == 0 {
+		return 0, false, fmt.Errorf("Unable to parse origin AS number")
+	}
+
+	return origin, exists, nil
+}
+
+func getExistsFromResponse(res *response) bool {
+	return res.Data.Exists
+}
+
+func getOriginFromResponse(res *response) int {
+	return res.Data.Origin
+	/*o, err := strconv.Atoi(res.Data.Origin)
+	if err != nil {
+		return 0
+	}
+	return o*/
+}
+
+func getASPathFromResponse(res *response) ([]int, []int) {
+	path := make([]int, 0, len(res.Data.ASPath))
+	for _, v := range res.Data.ASPath {
+		i, _ := strconv.Atoi(v)
+		path = append(path, i)
+	}
+	if len(res.Data.ASSet) > 0 {
+		as := make([]int, 0, len(res.Data.ASSet))
+		for _, v := range res.Data.ASSet {
+			i, _ := strconv.Atoi(v)
+			as = append(as, i)
+		}
+		return path, as
+	}
+
+	return path, []int{}
+}
+
+// GetASPath uses the /aspath handler.
+func (c *Client) GetASPath(ip string) ([]int, []int, bool, error) {
+	if !bogons.ValidPublicIP(ip) {
+		return nil, nil, false, fmt.Errorf("Not a valid IP")
+	}
+
+	p := net.ParseIP(ip)
+	resp, err := c.getRequest("aspath", p.String())
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	exists := getExistsFromResponse(resp)
+	if !exists {
+		return nil, nil, false, err
+	}
+
+	paths, sets := getASPathFromResponse(resp)
+	return paths, sets, exists, nil
+}
+
+// GetROA uses the /roa handler.
+func (c *Client) GetROA(ip string) (string, bool, error) {
+	if !bogons.ValidPublicIP(ip) {
+		return "", false, fmt.Errorf("Not a valid IP")
+	}
+
+	p := net.ParseIP(ip)
+	resp, err := c.getRequest("roa", p.String())
+	if err != nil {
+		return "", false, err
+	}
+
+	exists := getExistsFromResponse(resp)
+	if !exists {
+		return "", false, err
+	}
+
+	return resp.Data.ROA, exists, nil
 }
