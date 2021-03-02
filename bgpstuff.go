@@ -3,6 +3,7 @@ package bgpstuff
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -95,6 +96,13 @@ func getURI(urls []string) string {
 	return uri.String()
 }
 
+// decodeJSON will populate a response struct with the body of the reply from the server.
+// Returns an error if it cannot unmarshal.
+func (res *response) decodeJSON(r io.Reader) error {
+	e := json.NewDecoder(r)
+	return e.Decode(res)
+}
+
 // getRequest will take a handler and any arugments and request
 // a response from the bgpstuff.net API. Timeouts are set to 5 seconds
 // to prevent hanging connections.
@@ -103,7 +111,6 @@ func (c Client) getRequest(urls ...string) (*response, error) {
 
 	uri := getURI(urls)
 
-	var resp response
 	re, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		return nil, err
@@ -121,8 +128,9 @@ func (c Client) getRequest(urls ...string) (*response, error) {
 
 	defer res.Body.Close()
 
-	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-		return nil, err
+	var resp response
+	if err := resp.decodeJSON(res.Body); err != nil {
+		return &resp, err
 	}
 
 	return &resp, nil
