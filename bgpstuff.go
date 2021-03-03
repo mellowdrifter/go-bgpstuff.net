@@ -1,9 +1,8 @@
 package bgpstuff
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -18,60 +17,15 @@ const (
 	api     = "https://test.bgpstuff.net"
 )
 
+var (
+	errInvalidIP  = errors.New("Invalid IP")
+	errInvalidASN = errors.New("Invalid AS Number")
+)
+
 // Client is a client to the bgpstuff.net REST API
 type Client struct {
-	Loc string
-}
-
-type response struct {
-	Data data `json:"Response"`
-}
-
-// data is the struct received on each successul query.
-// Copied directly from https://github.com/mellowdrifter/bgpstuff.netv2/blob/master/pkg/models/models.go
-type data struct {
-	Action    string     // What action is being performed?
-	Route     string     // /route response
-	ASPath    []string   `json:"ASPath"` //aspath response
-	ASSet     []string   `json:"ASSet"`
-	Origin    int        `json:"Origin,string,omitempty"`
-	ROA       string     // /roa response
-	ASName    string     // /asname response
-	ASLocale  string     // /asname locale
-	Invalids  []Invalids // /invalids response
-	Sourced   Sourced    // /sourced response
-	Location  Location   // /whereami response
-	Totals    Totals     // /totals response
-	IP        string     // IP address being queried
-	Exists    bool       // Specifies if there was an actual reply
-	CacheTime time.Time  // If set, this is how old the entry is in the cache
-}
-
-// Sourced contains the amount of IPv4 and IPv6 prefixes.
-// As well as the prefixes.
-type Sourced struct {
-	Ipv4, Ipv6 uint32
-	Prefixes   []string
-}
-
-// Totals contains the amount of IPv4 and IPv6 prefixes in the RIB.
-// Also the unix timestamp
-type Totals struct {
-	Ipv4, Ipv6 uint32
-	Time       uint64
-}
-
-// Location contains the coordinates and map of the ingress location.
-type Location struct {
-	Lat, Long     string
-	City, Country string
-	Map           string // a base64 encoded png
-}
-
-// Invalids contains all the ROA invalids prefixes originated by an ASN.
-type Invalids struct {
-	ASN      string
-	Prefixes []string
+	Loc     string
+	ASNames map[int]string
 }
 
 //NewBGPClient return a pointer to a new client
@@ -96,18 +50,11 @@ func getURI(urls []string) string {
 	return uri.String()
 }
 
-// decodeJSON will populate a response struct with the body of the reply from the server.
-// Returns an error if it cannot unmarshal.
-func (res *response) decodeJSON(r io.Reader) error {
-	e := json.NewDecoder(r)
-	return e.Decode(res)
-}
-
 // getRequest will take a handler and any arugments and request
 // a response from the bgpstuff.net API. Timeouts are set to 5 seconds
 // to prevent hanging connections.
 func (c Client) getRequest(urls ...string) (*response, error) {
-	client := newHTTPClient(time.Second * 5)
+	client := newHTTPClient(time.Second * 8)
 
 	uri := getURI(urls)
 
@@ -139,7 +86,7 @@ func (c Client) getRequest(urls ...string) (*response, error) {
 // GetRoute uses the /route handler
 func (c *Client) GetRoute(ip string) (*net.IPNet, bool, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return nil, false, fmt.Errorf("Not a valid IP")
+		return nil, false, errInvalidIP
 	}
 
 	p := net.ParseIP(ip)
@@ -164,7 +111,7 @@ func (c *Client) GetRoute(ip string) (*net.IPNet, bool, error) {
 // GetOrigin uses the /origin handler.
 func (c *Client) GetOrigin(ip string) (int, bool, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return 0, false, fmt.Errorf("Not a valid IP")
+		return 0, false, errInvalidIP
 	}
 
 	p := net.ParseIP(ip)
@@ -192,11 +139,6 @@ func getExistsFromResponse(res *response) bool {
 
 func getOriginFromResponse(res *response) int {
 	return res.Data.Origin
-	/*o, err := strconv.Atoi(res.Data.Origin)
-	if err != nil {
-		return 0
-	}
-	return o*/
 }
 
 func getASPathFromResponse(res *response) ([]int, []int) {
@@ -220,7 +162,7 @@ func getASPathFromResponse(res *response) ([]int, []int) {
 // GetASPath uses the /aspath handler.
 func (c *Client) GetASPath(ip string) ([]int, []int, bool, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return nil, nil, false, fmt.Errorf("Not a valid IP")
+		return nil, nil, false, errInvalidIP
 	}
 
 	p := net.ParseIP(ip)
@@ -241,7 +183,7 @@ func (c *Client) GetASPath(ip string) ([]int, []int, bool, error) {
 // GetROA uses the /roa handler.
 func (c *Client) GetROA(ip string) (string, bool, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return "", false, fmt.Errorf("Not a valid IP")
+		return "", false, errInvalidIP
 	}
 
 	p := net.ParseIP(ip)
@@ -256,4 +198,47 @@ func (c *Client) GetROA(ip string) (string, bool, error) {
 	}
 
 	return resp.Data.ROA, exists, nil
+}
+
+// GetASName uses the /asname handler
+func (c *Client) GetASName(asn int) (string, bool, error) {
+	if !bogons.ValidPublicASN(uint32(asn)) {
+		return "", false, errInvalidASN
+	}
+
+	// Check asnames if it has the entry
+	if len(c.ASNames) > 1 {
+		if name, ok := c.ASNames[asn]; ok {
+			return name, ok, nil
+		}
+		return "", false, nil
+	}
+
+	resp, err := c.getRequest("asname", fmt.Sprint(asn))
+	if err != nil {
+		return "", false, err
+	}
+
+	exists := getExistsFromResponse(resp)
+	if !exists {
+		return "", false, err
+	}
+
+	return resp.Data.ASName, exists, nil
+}
+
+// GetASNames uses the /asnames handler
+func (c *Client) GetASNames() error {
+	c.ASNames = make(map[int]string)
+
+	resp, err := c.getRequest("asnames")
+	if err != nil {
+		return err
+	}
+
+	for _, v := range resp.Data.ASNames {
+		c.ASNames[int(v.ASN)] = v.ASName
+	}
+
+	return nil
 }
