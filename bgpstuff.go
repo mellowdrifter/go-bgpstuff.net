@@ -24,8 +24,9 @@ var (
 
 // Client is a client to the bgpstuff.net REST API
 type Client struct {
-	Loc     string
-	ASNames map[int]string
+	Loc      string
+	ASNames  map[int]string
+	Invalids map[int][]*net.IPNet
 }
 
 //NewBGPClient return a pointer to a new client
@@ -241,4 +242,41 @@ func (c *Client) GetASNames() error {
 	}
 
 	return nil
+}
+
+// GetInvalids grabs all current invalids and populates c.Invalids
+func (c *Client) GetInvalids() error {
+	c.Invalids = make(map[int][]*net.IPNet)
+
+	resp, err := c.getRequest("invalids")
+	if err != nil {
+		return err
+	}
+
+	for _, v := range resp.Data.Invalids {
+		prefixes := make([]*net.IPNet, 0, len(v.Prefixes))
+		for _, prefix := range v.Prefixes {
+			_, ipnet, err := net.ParseCIDR(prefix)
+			if err != nil {
+				return err
+			}
+			prefixes = append(prefixes, ipnet)
+		}
+		c.Invalids[int(v.ASN)] = prefixes
+	}
+	return nil
+}
+
+// GetInvalid implements the /invalid handler
+func (c *Client) GetInvalid(asn int) ([]*net.IPNet, bool, error) {
+	if !bogons.ValidPublicASN(uint32(asn)) {
+		return nil, false, errInvalidASN
+	}
+
+	if c.Invalids == nil {
+		return nil, false, fmt.Errorf("invalids is empty, run GetInvalids() first")
+	}
+
+	val, ok := c.Invalids[asn]
+	return val, ok, nil
 }

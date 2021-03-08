@@ -54,7 +54,7 @@ type Location struct {
 
 // Invalids contains all the ROA invalids prefixes originated by an ASN.
 type Invalids struct {
-	ASN      string
+	ASN      int `json:"ASN,string"`
 	Prefixes []string
 }
 
