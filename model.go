@@ -34,14 +34,14 @@ type data struct {
 // Sourced contains the amount of IPv4 and IPv6 prefixes.
 // As well as the prefixes.
 type Sourced struct {
-	Ipv4, Ipv6 uint32
+	Ipv4, Ipv6 int
 	Prefixes   []string
 }
 
 // Totals contains the amount of IPv4 and IPv6 prefixes in the RIB.
 // Also the unix timestamp
 type Totals struct {
-	Ipv4, Ipv6 uint32
+	Ipv4, Ipv6 int
 	Time       uint64
 }
 

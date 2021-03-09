@@ -280,3 +280,25 @@ func (c *Client) GetInvalid(asn int) ([]*net.IPNet, bool, error) {
 	val, ok := c.Invalids[asn]
 	return val, ok, nil
 }
+
+// GetSourced implements the /sourced handler
+func (c *Client) GetSourced(asn int) ([]*net.IPNet, int, int, error) {
+	if !bogons.ValidPublicASN(uint32(asn)) {
+		return nil, 0, 0, errInvalidASN
+	}
+
+	resp, err := c.getRequest("sourced", fmt.Sprint(asn))
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	prefixes := make([]*net.IPNet, 0, len(resp.Data.Sourced.Prefixes))
+	for _, v := range resp.Data.Sourced.Prefixes {
+		_, prefix, err := net.ParseCIDR(v)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		prefixes = append(prefixes, prefix)
+	}
+	return prefixes, resp.Data.Sourced.Ipv4, resp.Data.Sourced.Ipv6, nil
+}

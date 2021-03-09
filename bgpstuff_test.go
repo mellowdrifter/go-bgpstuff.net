@@ -328,3 +328,29 @@ func TestInvalid(t *testing.T) {
 		t.Errorf("cloudflare advertises two invalid prefixes, but only seeing %d: %v", len(c.Invalids[13335]), c.Invalids[13335])
 	}
 }
+
+func TestSourced(t *testing.T) {
+	c := bgpstuff.NewBGPClient()
+	prefixes, v4, v6, err := c.GetSourced(15169)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if (v4 == 0) || (v6 == 0) {
+		t.Errorf("AS15169 should be advertising more than zero IPv4 and IPv6 addresses, but got IPv4: %d and IPv6: %d", v4, v6)
+	}
+
+	_, dns, _ := net.ParseCIDR("8.8.8.0/24")
+	if !containsSubnet(dns, prefixes) {
+		t.Error("Expected to see 8.8.8.0/24, but not found")
+	}
+}
+
+func containsSubnet(prefix *net.IPNet, prefixes []*net.IPNet) bool {
+	for _, v := range prefixes {
+		if v.String() == prefix.String() {
+			return true
+		}
+	}
+	return false
+}
