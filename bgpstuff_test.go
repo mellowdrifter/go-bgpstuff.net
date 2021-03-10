@@ -354,3 +354,15 @@ func containsSubnet(prefix *net.IPNet, prefixes []*net.IPNet) bool {
 	}
 	return false
 }
+
+func TestTotals(t *testing.T) {
+	c := bgpstuff.NewBGPClient()
+	ipv4, ipv6, err := c.GetTotals()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ipv4 < 800000 || ipv6 < 100000 {
+		t.Errorf("Expecting a certain amount of prefixes, but got %d IPv4 and %d IPv6", ipv4, ipv6)
+	}
+}

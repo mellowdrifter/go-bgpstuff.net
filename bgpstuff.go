@@ -302,3 +302,13 @@ func (c *Client) GetSourced(asn int) ([]*net.IPNet, int, int, error) {
 	}
 	return prefixes, resp.Data.Sourced.Ipv4, resp.Data.Sourced.Ipv6, nil
 }
+
+// GetTotals implements the /totals handler
+func (c *Client) GetTotals() (int, int, error) {
+	resp, err := c.getRequest("totals")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return resp.Data.Totals.Ipv4, resp.Data.Totals.Ipv6, nil
+}
