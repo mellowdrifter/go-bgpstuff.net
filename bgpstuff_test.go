@@ -44,11 +44,11 @@ func TestRoute(t *testing.T) {
 	c := bgpstuff.NewBGPClient()
 	for _, tc := range tests {
 		t.Run(tc.ip, func(t *testing.T) {
-			got, exists, err := c.GetRoute(tc.ip)
-			if tc.wantExists && !exists {
+			got, err := c.GetRoute(tc.ip)
+			if tc.wantExists && got == nil {
 				t.Errorf("Prefix should exist, but exist returned false")
 			}
-			if !tc.wantExists && exists {
+			if !tc.wantExists && got != nil {
 				t.Errorf("Prefix should not exist, but exist returned true")
 			}
 			if tc.wantErr && err == nil {
@@ -99,11 +99,11 @@ func TestOrigin(t *testing.T) {
 	c := bgpstuff.NewBGPClient()
 	for _, tc := range tests {
 		t.Run(tc.ip, func(t *testing.T) {
-			got, exists, err := c.GetOrigin(tc.ip)
-			if tc.wantExists && !exists {
+			got, err := c.GetOrigin(tc.ip)
+			if tc.wantExists && got == 0 {
 				t.Errorf("Origin should exist, but exist returned false")
 			}
-			if !tc.wantExists && exists {
+			if !tc.wantExists && got != 0 {
 				t.Errorf("Origin should not exist, but exist returned true")
 			}
 			if tc.wantErr && err == nil {
@@ -153,11 +153,11 @@ func TestASPath(t *testing.T) {
 	c := bgpstuff.NewBGPClient()
 	for _, tc := range tests {
 		t.Run(tc.ip, func(t *testing.T) {
-			got, _, exists, err := c.GetASPath(tc.ip)
-			if tc.wantExists && !exists {
+			got, _, err := c.GetASPath(tc.ip)
+			if tc.wantExists && got == nil {
 				t.Errorf("Origin should exist, but exist returned false")
 			}
-			if !tc.wantExists && exists {
+			if !tc.wantExists && got != nil {
 				t.Errorf("Origin should not exist, but exist returned true")
 			}
 			if tc.wantErr && err == nil {
@@ -212,12 +212,12 @@ func TestROA(t *testing.T) {
 	c := bgpstuff.NewBGPClient()
 	for _, tc := range tests {
 		t.Run(tc.ip, func(t *testing.T) {
-			got, exists, err := c.GetROA(tc.ip)
-			if tc.wantExists && !exists {
+			got, err := c.GetROA(tc.ip)
+			if tc.wantExists && got == "" {
 				t.Errorf("Origin should exist, but exist returned false")
 			}
-			if !tc.wantExists && exists {
-				t.Errorf("Origin should not exist, but exist returned true")
+			if !tc.wantExists && got != "" {
+				t.Errorf("Origin should not exist, but exist returned true: %v", got)
 			}
 			if tc.wantErr && err == nil {
 				t.Error("Expected error, but no error returned")
@@ -259,11 +259,11 @@ func TestASName(t *testing.T) {
 	c.GetASNames()
 	for _, tc := range tests {
 		t.Run(fmt.Sprint(tc.asn), func(t *testing.T) {
-			name, exists, err := c.GetASName(tc.asn)
-			if tc.wantExists && !exists {
+			name, err := c.GetASName(tc.asn)
+			if tc.wantExists && name == "" {
 				t.Errorf("AS name should exist, but exist returned false")
 			}
-			if !tc.wantExists && exists {
+			if !tc.wantExists && name != "" {
 				t.Errorf("AS name should not exist, but exist returned true")
 			}
 			if tc.wantErr && err == nil {
@@ -311,18 +311,18 @@ func TestInvalids(t *testing.T) {
 
 func TestInvalid(t *testing.T) {
 	c := bgpstuff.NewBGPClient()
-	_, _, err := c.GetInvalid(13335)
+	_, err := c.GetInvalid(13335)
 	if err == nil {
 		t.Errorf("expected error, but got none")
 	}
 
 	c.GetInvalids()
-	prefixes, exists, err := c.GetInvalid(13335)
+	prefixes, err := c.GetInvalid(13335)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exists == false {
-		t.Fatalf("wanted true, but got false")
+	if len(prefixes) == 0 {
+		t.Fatalf("wanted some invalids, but returned %d", len(prefixes))
 	}
 	if len(prefixes) != 2 {
 		t.Errorf("cloudflare advertises two invalid prefixes, but only seeing %d: %v", len(c.Invalids[13335]), c.Invalids[13335])

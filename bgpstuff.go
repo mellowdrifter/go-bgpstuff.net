@@ -85,61 +85,46 @@ func (c Client) getRequest(urls ...string) (*response, error) {
 }
 
 // GetRoute uses the /route handler
-func (c *Client) GetRoute(ip string) (*net.IPNet, bool, error) {
+func (c *Client) GetRoute(ip string) (*net.IPNet, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return nil, false, errInvalidIP
+		return nil, errInvalidIP
 	}
 
 	p := net.ParseIP(ip)
 	resp, err := c.getRequest("route", p.String())
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-
-	exists := getExistsFromResponse(resp)
-	if !exists {
-		return nil, false, err
+	// TODO: stop retruning "/0"
+	if resp.Data.Route == "/0" {
+		return nil, err
 	}
 
 	_, ipnet, err := net.ParseCIDR(resp.Data.Route)
 	if err != nil {
-		return nil, exists, err
+		return nil, err
 	}
 
-	return ipnet, exists, nil
+	return ipnet, nil
 }
 
 // GetOrigin uses the /origin handler.
-func (c *Client) GetOrigin(ip string) (int, bool, error) {
+func (c *Client) GetOrigin(ip string) (int, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return 0, false, errInvalidIP
+		return 0, errInvalidIP
 	}
 
 	p := net.ParseIP(ip)
 	resp, err := c.getRequest("origin", p.String())
 	if err != nil {
-		return 0, false, err
+		return 0, err
 	}
 
-	exists := getExistsFromResponse(resp)
-	if !exists {
-		return 0, false, err
-	}
-
-	origin := getOriginFromResponse(resp)
-	if origin == 0 {
-		return 0, false, fmt.Errorf("Unable to parse origin AS number")
-	}
-
-	return origin, exists, nil
+	return resp.Data.Origin, nil
 }
 
 func getExistsFromResponse(res *response) bool {
 	return res.Data.Exists
-}
-
-func getOriginFromResponse(res *response) int {
-	return res.Data.Origin
 }
 
 func getASPathFromResponse(res *response) ([]int, []int) {
@@ -161,71 +146,61 @@ func getASPathFromResponse(res *response) ([]int, []int) {
 }
 
 // GetASPath uses the /aspath handler.
-func (c *Client) GetASPath(ip string) ([]int, []int, bool, error) {
+func (c *Client) GetASPath(ip string) ([]int, []int, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return nil, nil, false, errInvalidIP
+		return nil, nil, errInvalidIP
 	}
 
 	p := net.ParseIP(ip)
 	resp, err := c.getRequest("aspath", p.String())
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 
 	exists := getExistsFromResponse(resp)
 	if !exists {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 
 	paths, sets := getASPathFromResponse(resp)
-	return paths, sets, exists, nil
+	return paths, sets, nil
 }
 
 // GetROA uses the /roa handler.
-func (c *Client) GetROA(ip string) (string, bool, error) {
+func (c *Client) GetROA(ip string) (string, error) {
 	if !bogons.ValidPublicIP(ip) {
-		return "", false, errInvalidIP
+		return "", errInvalidIP
 	}
 
 	p := net.ParseIP(ip)
 	resp, err := c.getRequest("roa", p.String())
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 
-	exists := getExistsFromResponse(resp)
-	if !exists {
-		return "", false, err
-	}
-
-	return resp.Data.ROA, exists, nil
+	return resp.Data.ROA, nil
 }
 
 // GetASName uses the /asname handler
-func (c *Client) GetASName(asn int) (string, bool, error) {
+func (c *Client) GetASName(asn int) (string, error) {
 	if !bogons.ValidPublicASN(uint32(asn)) {
-		return "", false, errInvalidASN
+		return "", errInvalidASN
 	}
 
 	// Check asnames if it has the entry
 	if len(c.ASNames) > 1 {
 		if name, ok := c.ASNames[asn]; ok {
-			return name, ok, nil
+			return name, nil
 		}
-		return "", false, nil
+		return "", nil
 	}
 
 	resp, err := c.getRequest("asname", fmt.Sprint(asn))
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 
-	exists := getExistsFromResponse(resp)
-	if !exists {
-		return "", false, err
-	}
-
-	return resp.Data.ASName, exists, nil
+	return resp.Data.ASName, nil
 }
 
 // GetASNames uses the /asnames handler
@@ -268,17 +243,16 @@ func (c *Client) GetInvalids() error {
 }
 
 // GetInvalid implements the /invalid handler
-func (c *Client) GetInvalid(asn int) ([]*net.IPNet, bool, error) {
+func (c *Client) GetInvalid(asn int) ([]*net.IPNet, error) {
 	if !bogons.ValidPublicASN(uint32(asn)) {
-		return nil, false, errInvalidASN
+		return nil, errInvalidASN
 	}
 
 	if c.Invalids == nil {
-		return nil, false, fmt.Errorf("invalids is empty, run GetInvalids() first")
+		return nil, fmt.Errorf("invalids is empty, run GetInvalids() first")
 	}
 
-	val, ok := c.Invalids[asn]
-	return val, ok, nil
+	return c.Invalids[asn], nil
 }
 
 // GetSourced implements the /sourced handler
