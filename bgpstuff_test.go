@@ -155,10 +155,10 @@ func TestASPath(t *testing.T) {
 		t.Run(tc.ip, func(t *testing.T) {
 			got, _, err := c.GetASPath(tc.ip)
 			if tc.wantExists && got == nil {
-				t.Errorf("Origin should exist, but exist returned false")
+				t.Errorf("AS-path should exist, but exist returned false")
 			}
 			if !tc.wantExists && got != nil {
-				t.Errorf("Origin should not exist, but exist returned true")
+				t.Errorf("AS-path should not exist, but exist returned true")
 			}
 			if tc.wantErr && err == nil {
 				t.Error("Expected error, but no error returned")
@@ -214,10 +214,10 @@ func TestROA(t *testing.T) {
 		t.Run(tc.ip, func(t *testing.T) {
 			got, err := c.GetROA(tc.ip)
 			if tc.wantExists && got == "" {
-				t.Errorf("Origin should exist, but exist returned false")
+				t.Errorf("ROA should exist, but exist returned false")
 			}
 			if !tc.wantExists && got != "" {
-				t.Errorf("Origin should not exist, but exist returned true: %v", got)
+				t.Errorf("ROA should not exist, but exist returned true: %v", got)
 			}
 			if tc.wantErr && err == nil {
 				t.Error("Expected error, but no error returned")

@@ -123,11 +123,10 @@ func (c *Client) GetOrigin(ip string) (int, error) {
 	return resp.Data.Origin, nil
 }
 
-func getExistsFromResponse(res *response) bool {
-	return res.Data.Exists
-}
-
 func getASPathFromResponse(res *response) ([]int, []int) {
+	if len(res.Data.ASPath) == 0 {
+		return nil, nil
+	}
 	path := make([]int, 0, len(res.Data.ASPath))
 	for _, v := range res.Data.ASPath {
 		i, _ := strconv.Atoi(v)
@@ -142,7 +141,7 @@ func getASPathFromResponse(res *response) ([]int, []int) {
 		return path, as
 	}
 
-	return path, []int{}
+	return path, nil
 }
 
 // GetASPath uses the /aspath handler.
@@ -154,11 +153,6 @@ func (c *Client) GetASPath(ip string) ([]int, []int, error) {
 	p := net.ParseIP(ip)
 	resp, err := c.getRequest("aspath", p.String())
 	if err != nil {
-		return nil, nil, err
-	}
-
-	exists := getExistsFromResponse(resp)
-	if !exists {
 		return nil, nil, err
 	}
 
@@ -176,6 +170,11 @@ func (c *Client) GetROA(ip string) (string, error) {
 	resp, err := c.getRequest("roa", p.String())
 	if err != nil {
 		return "", err
+	}
+
+	// If there is no origin, there is no prefix ROA to check.
+	if resp.Data.Origin == 0 {
+		return "", nil
 	}
 
 	return resp.Data.ROA, nil
