@@ -95,7 +95,13 @@ func (c *Client) GetRoute(ip string) (*net.IPNet, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: stop retruning "/0"
+
+	// Response could be no route.
+	if resp.Data.Route == "" {
+		return nil, nil
+	}
+
+	// TODO: stop returning "/0"
 	if resp.Data.Route == "/0" {
 		return nil, err
 	}
