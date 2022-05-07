@@ -41,7 +41,9 @@ func TestRoute(t *testing.T) {
 		},
 	}
 
-	c := bgpstuff.NewBGPClient()
+	// TODO: Interface?
+	c := bgpstuff.NewBGPClient(true)
+
 	for _, tc := range tests {
 		t.Run(tc.ip, func(t *testing.T) {
 			got, err := c.GetRoute(tc.ip)
@@ -96,7 +98,7 @@ func TestOrigin(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	for _, tc := range tests {
 		t.Run(tc.ip, func(t *testing.T) {
 			got, err := c.GetOrigin(tc.ip)
@@ -150,7 +152,7 @@ func TestASPath(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	for _, tc := range tests {
 		t.Run(tc.ip, func(t *testing.T) {
 			got, _, err := c.GetASPath(tc.ip)
@@ -209,7 +211,7 @@ func TestROA(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	for _, tc := range tests {
 		t.Run(tc.ip, func(t *testing.T) {
 			got, err := c.GetROA(tc.ip)
@@ -255,7 +257,7 @@ func TestASName(t *testing.T) {
 			asn: 4199999999,
 		},
 	}
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	c.GetASNames()
 	for _, tc := range tests {
 		t.Run(fmt.Sprint(tc.asn), func(t *testing.T) {
@@ -282,7 +284,7 @@ func TestASName(t *testing.T) {
 }
 
 func TestASNames(t *testing.T) {
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	if err := c.GetASNames(); err != nil {
 		t.Errorf("got error: %v", err)
 	}
@@ -296,7 +298,7 @@ func TestASNames(t *testing.T) {
 }
 
 func TestInvalids(t *testing.T) {
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	if err := c.GetInvalids(); err != nil {
 		t.Errorf("got error: %v", err)
 	}
@@ -304,13 +306,13 @@ func TestInvalids(t *testing.T) {
 		t.Errorf("Should have some invalids, but seeing %d invalids", len(c.Invalids))
 	}
 
-	if len(c.Invalids[13335]) != 2 {
-		t.Errorf("cloudflare advertises two invalid prefixes, but only seeing %d: %v", len(c.Invalids[13335]), c.Invalids[13335])
+	if len(c.Invalids[13335]) != 3 {
+		t.Errorf("cloudflare advertises three invalid prefixes, but seeing %d: %v", len(c.Invalids[13335]), c.Invalids[13335])
 	}
 }
 
 func TestInvalid(t *testing.T) {
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	_, err := c.GetInvalid(13335)
 	if err == nil {
 		t.Errorf("expected error, but got none")
@@ -324,13 +326,13 @@ func TestInvalid(t *testing.T) {
 	if len(prefixes) == 0 {
 		t.Fatalf("wanted some invalids, but returned %d", len(prefixes))
 	}
-	if len(prefixes) != 2 {
-		t.Errorf("cloudflare advertises two invalid prefixes, but only seeing %d: %v", len(c.Invalids[13335]), c.Invalids[13335])
+	if len(prefixes) != 3 {
+		t.Errorf("cloudflare advertises three invalid prefixes, but seeing %d: %v", len(c.Invalids[13335]), c.Invalids[13335])
 	}
 }
 
 func TestSourced(t *testing.T) {
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	prefixes, v4, v6, err := c.GetSourced(15169)
 	if err != nil {
 		t.Fatal(err)
@@ -356,7 +358,7 @@ func containsSubnet(prefix *net.IPNet, prefixes []*net.IPNet) bool {
 }
 
 func TestTotals(t *testing.T) {
-	c := bgpstuff.NewBGPClient()
+	c := bgpstuff.NewBGPClient(true)
 	ipv4, ipv6, err := c.GetTotals()
 	if err != nil {
 		t.Fatal(err)

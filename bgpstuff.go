@@ -1,6 +1,7 @@
 package bgpstuff
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -10,28 +11,47 @@ import (
 	"time"
 
 	"github.com/mellowdrifter/bogons"
+	"golang.org/x/time/rate"
 )
 
 const (
 	version = "1.0.0"
-	api     = "https://test.bgpstuff.net"
+	liveapi = "https://bgpstuff.net"
+	testapi = "https://test.bgpstuff.net"
 )
 
 var (
-	errInvalidIP  = errors.New("Invalid IP")
-	errInvalidASN = errors.New("Invalid AS Number")
+	errInvalidIP  = errors.New("invalid IP")
+	errInvalidASN = errors.New("invalid AS Number")
+	rpm           = 30 // requests per minute
 )
 
 // Client is a client to the bgpstuff.net REST API
 type Client struct {
 	Loc      string
+	limiter  *rate.Limiter
+	api      string
 	ASNames  map[int]string
 	Invalids map[int][]*net.IPNet
 }
 
-//NewBGPClient return a pointer to a new client
-func NewBGPClient() *Client {
-	return &Client{}
+// NewBGPClient return a pointer to a new client
+// TODO: Hate setting testing here...
+func NewBGPClient(testing bool) *Client {
+	r := rate.Every(time.Minute / time.Duration(rpm))
+	limit := rate.NewLimiter(r, rpm)
+
+	var api string
+	if testing {
+		api = testapi
+	} else {
+		api = liveapi
+	}
+
+	return &Client{
+		limiter: limit,
+		api:     api,
+	}
 }
 
 func newHTTPClient(timeout time.Duration) *http.Client {
@@ -40,9 +60,9 @@ func newHTTPClient(timeout time.Duration) *http.Client {
 	}
 }
 
-func getURI(urls []string) string {
+func (c *Client) getURI(urls []string) string {
 	var uri strings.Builder
-	uri.WriteString(api)
+	uri.WriteString(c.api)
 	for _, v := range urls {
 		uri.WriteString("/")
 		uri.WriteString(v)
@@ -55,9 +75,12 @@ func getURI(urls []string) string {
 // a response from the bgpstuff.net API. Timeouts are set to 5 seconds
 // to prevent hanging connections.
 func (c Client) getRequest(urls ...string) (*response, error) {
+	if err := c.limiter.Wait(context.Background()); err != nil {
+		return nil, err
+	}
 	client := newHTTPClient(time.Second * 8)
 
-	uri := getURI(urls)
+	uri := c.getURI(urls)
 
 	re, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
@@ -71,7 +94,7 @@ func (c Client) getRequest(urls ...string) (*response, error) {
 		return nil, err
 	}
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Received status: %s (%d)", http.StatusText(res.StatusCode), res.StatusCode)
+		return nil, fmt.Errorf("received status: %s (%d)", http.StatusText(res.StatusCode), res.StatusCode)
 	}
 
 	defer res.Body.Close()

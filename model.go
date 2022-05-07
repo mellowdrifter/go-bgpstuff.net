@@ -15,7 +15,7 @@ type response struct {
 type data struct {
 	Action    string      // What action is being performed?
 	Route     string      // /route response
-	ASPath    []string    `json:"ASPath"` //aspath response
+	ASPath    []string    `json:"ASPath"` // aspath response
 	ASSet     []string    `json:"ASSet"`
 	Origin    int         `json:"Origin,string"`
 	ROA       string      `json:"ROA"`    // /roa response
@@ -58,7 +58,7 @@ type Invalids struct {
 	Prefixes []string
 }
 
-//ASNumName contains an AS number, name, and locale.
+// ASNumName contains an AS number, name, and locale.
 type ASNumName struct {
 	ASN      uint32
 	ASName   string
