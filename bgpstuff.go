@@ -314,3 +314,18 @@ func (c *Client) GetTotals() (int, int, error) {
 
 	return resp.Data.Totals.Ipv4, resp.Data.Totals.Ipv6, nil
 }
+
+// GetGeoIP uses the /geoip handler.
+func (c *Client) GetGeoIP(ip string) (*Location, error) {
+	if !bogons.ValidPublicIP(ip) {
+		return nil, errInvalidIP
+	}
+
+	p := net.ParseIP(ip)
+	resp, err := c.getRequest("geoip", p.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp.Data.Location, nil
+}
