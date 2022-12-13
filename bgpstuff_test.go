@@ -368,3 +368,60 @@ func TestTotals(t *testing.T) {
 		t.Errorf("Expecting a certain amount of prefixes, but got %d IPv4 and %d IPv6", ipv4, ipv6)
 	}
 }
+
+func TestGeoIP(t *testing.T) {
+	type locExpectation struct {
+		city    string
+		country string
+	}
+
+	t.Parallel()
+	tests := []struct {
+		ip      string
+		want    locExpectation
+		wantErr bool
+	}{
+		{
+			ip:      "8.8.8.8",
+			wantErr: false,
+			want: locExpectation{
+				city:    "Ashburn",
+				country: "United States",
+			},
+		},
+		{
+			ip:      "192.168.1.1",
+			wantErr: true,
+		},
+		{
+			ip:      "🥺",
+			wantErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.ip, func(t *testing.T) {
+			c := bgpstuff.NewBGPClient(true)
+			loc, err := c.GetGeoIP(tc.ip)
+
+			if tc.wantErr && err == nil {
+				t.Fatalf("Expected error, but no error returned")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("No error expected, but got error: %v", err)
+			}
+			if tc.wantErr {
+				return
+			}
+
+			if loc == nil {
+				t.Fatalf("Got nil, Want: %v", tc.want)
+			}
+			if loc.City != tc.want.city {
+				t.Fatalf("Got: %s, Want: %s", loc.City, tc.want.city)
+			}
+			if loc.Country != tc.want.country {
+				t.Fatalf("Got: %s, Want: %s", loc.Country, tc.want.country)
+			}
+		})
+	}
+}
