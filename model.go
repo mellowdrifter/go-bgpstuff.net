@@ -25,6 +25,7 @@ type data struct {
 	Invalids  []Invalids  // /invalids response
 	Sourced   Sourced     // /sourced response
 	Location  Location    // /whereami response
+	GeoIP     Location    // /geoip response
 	Totals    Totals      // /totals response
 	IP        string      // IP address being queried
 	Exists    bool        // Specifies if there was an actual reply

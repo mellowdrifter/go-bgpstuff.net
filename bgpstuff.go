@@ -327,5 +327,5 @@ func (c *Client) GetGeoIP(ip string) (*Location, error) {
 		return nil, err
 	}
 
-	return &resp.Data.Location, nil
+	return &resp.Data.GeoIP, nil
 }

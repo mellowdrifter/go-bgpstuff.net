@@ -385,8 +385,8 @@ func TestGeoIP(t *testing.T) {
 			ip:      "8.8.8.8",
 			wantErr: false,
 			want: locExpectation{
-				city:    "",
-				country: "",
+				city:    "Ashburn",
+				country: "United States",
 			},
 		},
 		{
